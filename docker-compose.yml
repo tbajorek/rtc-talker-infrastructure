@@ -1,0 +1,84 @@
+version: '3.0'
+services:
+
+  mysql:
+    image: mysql:5.7
+    container_name: rtc-talker-db
+    env_file:
+      - .env
+    environment:
+      - 'MYSQL_DATABASE=${DB_NAME}'
+      - 'MYSQL_USER=${DB_USERNAME}'
+      - 'MYSQL_PASSWORD=${DB_PASSWORD}'
+      - 'MYSQL_ROOT_PASSWORD=${DB_PASSWORD}'
+    networks:
+      rtc-talker:
+        ipv4_address: 21.21.21.2
+    hostname: mysql
+
+  adminer:
+    image: adminer
+    container_name: rtc-talker-adminer
+    restart: always
+    links:
+      - mysql
+    ports:
+      - '8080:8080'
+    networks:
+      rtc-talker:
+        ipv4_address: 21.21.21.3
+
+  php-fpm:
+    build: ./docker/php-fpm
+    container_name: rtc-talker-php
+    working_dir: /rtc-talker
+    links:
+      - mysql
+
+    volumes:
+      - './rtc-talker:/rtc-talker'
+      - './install:/install'
+      - './docker/nginx/log/:/var/log/nginx/'
+      - './docker/php-fpm/php-ini-overrides.ini:/etc/php/7.2/fpm/conf.d/99-overrides.ini'
+    command: sh /install/installBackend.sh
+    networks:
+      rtc-talker:
+        ipv4_address: 21.21.21.4
+
+  nginx:
+    image: 'nginx:alpine'
+    container_name: rtc-talker-webserver
+    working_dir: /rtc-talker
+    links:
+      - php-fpm
+    volumes:
+      - './rtc-talker:/rtc-talker'
+      - './docker/nginx/conf/:/etc/nginx/conf.d/'
+      - './docker/nginx/log/:/var/log/nginx/'
+    ports:
+      - '8081:8081'
+      - '8082:8082'
+      - '8083:8083'
+    networks:
+      rtc-talker:
+        ipv4_address: 21.21.21.5
+
+  nodejs:
+    image: 'node:11.4'
+    container_name: rtc-talker-nodejs
+    working_dir: /rtc-talker
+    volumes:
+      - './rtc-talker:/rtc-talker'
+      - './install:/install'
+    ports:
+    - '9876:9876'
+    command: sh /install/installJs.sh
+    networks:
+      rtc-talker:
+        ipv4_address: 21.21.21.6
+
+networks:
+  rtc-talker:
+    ipam:
+      config:
+      - subnet: 21.21.21.0/24
